@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build Output
+dist/
+
+# Local Cloned Repositories Workspace
+workspace/
+
+# Environment Variables & Secret Files
+.env
+.env.*
+*.pem
+*.key
+*.cert
+
+# Generated Prisma Client
+src/generated/
+prisma/generated/
+
+# Logs & Temporary Patch Files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.agent_temp_fix.patch
+
+# IDE & OS Metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+notes.md
+Autonomous Software Maintenance Engineer.pdf
+test-pipeline.ts

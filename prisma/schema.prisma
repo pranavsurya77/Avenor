@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  password     String?
+  githubId     String?       @unique
+  role         Role          @default(USER)
+  name         String?
+  avatarUrl    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  repositories Repository[]
+  pullRequests PullRequest[]
+}
+
+model Repository {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  url          String?
+  isPrivate    Boolean       @default(false)
+  ownerId      String
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  pullRequests PullRequest[]
+  jobs         Job[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([ownerId, name])
+}
+
+model PullRequest {
+  id           String     @id @default(cuid())
+  title        String
+  description  String?
+  status       String     @default("OPEN") // OPEN, CLOSED, MERGED
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  jobs         Job[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Job {
+  id            String       @id @default(cuid())
+  name          String
+  status        String       @default("PENDING") // PENDING, RUNNING, SUCCESS, FAILED
+  logs          Log[]
+  pullRequestId String?
+  pullRequest   PullRequest? @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  repositoryId  String
+  repository    Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  message   String   @db.Text
+  level     String   @default("INFO") // INFO, WARN, ERROR
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
