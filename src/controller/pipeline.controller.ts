@@ -72,3 +72,55 @@ export async function getJobStatus(
         res.status(500).json({ error: "Failed to fetch job status" });
     }
 }
+
+export async function replyToJob(
+    req: Request<JobParams>,
+    res: Response
+) {
+    try {
+        const { jobId } = req.params;
+        const { answer } = req.body;
+
+        if (!answer || typeof answer !== "string" || !answer.trim()) {
+            res.status(400).json({ error: "Property 'answer' string is required in JSON body." });
+            return;
+        }
+
+        const previousJob = await Job.fromId(pipelineQueue, jobId);
+        if (!previousJob) {
+            res.status(404).json({ error: `Previous job with ID '${jobId}' not found.` });
+            return;
+        }
+
+        const { owner, repo, branch, issueNumber, issueTitle } = previousJob.data;
+
+        const newJob = await addPipelineJob({
+            owner,
+            repo,
+            branch: branch || "main",
+            triggerSource: "manual",
+            issueNumber,
+            issueTitle,
+            userAnswer: answer.trim(),
+            previousJobId: jobId
+        });
+
+        console.log(`[Controller] User replied to Job #${jobId}. Enqueued resume Job #${newJob.id}`);
+
+        res.status(202).json({
+            message: "User response received, pipeline resumed",
+            jobId: newJob.id,
+            statusUrl: `/pipeline/jobs/${newJob.id}`,
+            previousJobId: jobId,
+            data: {
+                owner,
+                repo,
+                branch: branch || "main",
+                userAnswer: answer.trim()
+            }
+        });
+    } catch (error) {
+        console.error("Error processing user reply to job:", error);
+        res.status(500).json({ error: "Failed to process reply and resume pipeline job" });
+    }
+}

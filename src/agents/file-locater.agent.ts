@@ -20,11 +20,16 @@ export interface PipelinePayload {
     }>;
 }
 
+const IGNORED_EXTENSIONS = [
+    '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp',
+    '.woff', '.woff2', '.ttf', '.eot', '.lock', '.pdf', '.zip',
+    '.tar', '.gz', '.jar', '.class', '.pyc', '.exe', '.dll', '.so',
+    '.dylib', '.map', '.min.js', '.min.css'
+];
+const IGNORED_FILENAMES = ['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
+
 /**
  * Identifies the most relevant files in a repository to solve a given issue.
- * 
- * Supports both a single combined payload object: { issues: [...], tree: { tree: [...] } }
- * and separate arguments: (issues, fileTree)
  */
 export async function locateRelevantFiles(
     inputOrIssues: PipelinePayload | any,
@@ -33,7 +38,6 @@ export async function locateRelevantFiles(
     let issues: any;
     let fileTree: any;
 
-    // Handle single combined object payload vs separate arguments
     if (fileTreeParam !== undefined) {
         issues = inputOrIssues;
         fileTree = fileTreeParam;
@@ -45,13 +49,20 @@ export async function locateRelevantFiles(
         fileTree = inputOrIssues;
     }
 
-    // Extract file paths from the tree
     const treeItems = Array.isArray(fileTree) ? fileTree : (fileTree?.tree || []);
-    const files = treeItems
+    const rawFiles = treeItems
         .filter((item: any) => item.type === 'blob')
         .map((item: any) => item.path);
 
-    console.log(`[file-locater] Received ${files.length} total files from repository tree.`);
+    // Token Optimization: Filter out assets, binaries, maps, and lockfiles
+    const files = rawFiles.filter((pathStr: string) => {
+        const lower = pathStr.toLowerCase();
+        const baseName = pathStr.split('/').pop() || '';
+        if (IGNORED_FILENAMES.includes(baseName)) return false;
+        return !IGNORED_EXTENSIONS.some(ext => lower.endsWith(ext));
+    });
+
+    console.log(`[file-locater] Filtered repository tree from ${rawFiles.length} files down to ${files.length} code files.`);
 
     // Format the issue details cleanly
     let issueDetails = '';
@@ -108,4 +119,3 @@ Example: { "files": ["README.md"] }
         return [];
     }
 }
-

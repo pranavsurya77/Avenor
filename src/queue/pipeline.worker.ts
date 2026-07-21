@@ -12,14 +12,15 @@ export function initPipelineWorker() {
         PIPELINE_QUEUE_NAME,
         async (job: Job<PipelineJobData>) => {
             console.log(
-                `[Worker] Processing Job #${job.id}: ${job.data.owner}/${job.data.repo} (Branch: ${job.data.branch || "main"})`
+                `[Worker] Processing Job #${job.id}: ${job.data.owner}/${job.data.repo} (Branch: ${job.data.branch || "main"})${job.data.userAnswer ? " [Resuming with User Answer]" : ""}`
             );
             await job.updateProgress(10);
 
             const result = await analyzeRepository(
                 job.data.owner,
                 job.data.repo,
-                job.data.branch || "main"
+                job.data.branch || "main",
+                job.data.userAnswer
             );
 
             await job.updateProgress(100);

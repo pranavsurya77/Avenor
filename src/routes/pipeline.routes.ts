@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { executePipeline, getJobStatus } from "../controller/pipeline.controller.js";
+import { executePipeline, getJobStatus, replyToJob } from "../controller/pipeline.controller.js";
 
 const router = Router();
 
@@ -9,5 +9,8 @@ router.route("/repos/:owner/:repo/start/:branch").get(executePipeline).post(exec
 
 // Get status and output of a queued job
 router.route("/jobs/:jobId").get(getJobStatus);
+
+// Post user answer to resume a job that requested clarification
+router.route("/jobs/:jobId/reply").post(replyToJob);
 
 export { router as pipelineRouter };

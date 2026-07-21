@@ -8,6 +8,8 @@ export interface PipelineJobData {
     triggerSource?: "manual" | "webhook";
     issueNumber?: number;
     issueTitle?: string;
+    userAnswer?: string;
+    previousJobId?: string;
 }
 
 export const PIPELINE_QUEUE_NAME = "pipelineQueue";
@@ -18,7 +20,8 @@ export const pipelineQueue = new Queue<PipelineJobData>(PIPELINE_QUEUE_NAME, {
 
 export async function addPipelineJob(data: PipelineJobData) {
     const branch = data.branch || "main";
-    const jobName = `analyze-${data.owner}-${data.repo}-${branch}`;
+    const prefix = data.userAnswer ? "resume" : "analyze";
+    const jobName = `${prefix}-${data.owner}-${data.repo}-${branch}`;
 
     const job = await pipelineQueue.add(jobName, data, {
         attempts: 3,

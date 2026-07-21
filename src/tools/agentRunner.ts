@@ -26,6 +26,20 @@ export async function runInteractiveAgentLoop(
     for (let step = 1; step <= maxIterations; step++) {
         console.log(`[AgentRunner] --- Iteration Step ${step}/${maxIterations} ---`);
 
+        // Token Optimization: Prune long outputs from older tool calls (keep last 6 messages full)
+        if (messages.length > 8) {
+            const preserveThreshold = messages.length - 6;
+            for (let i = 2; i < preserveThreshold; i++) {
+                const msg = messages[i];
+                if (msg && msg.role === "tool" && typeof msg.content === "string" && msg.content.length > 250) {
+                    messages[i] = {
+                        ...msg,
+                        content: msg.content.substring(0, 200) + "\n... [Older tool output truncated to conserve context tokens]"
+                    };
+                }
+            }
+        }
+
         const response = await nvidiaClient.chat.completions.create({
             model: DEFAULT_MODEL,
             messages,

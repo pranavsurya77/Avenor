@@ -110,7 +110,7 @@ export const AGENT_TOOLS: ChatCompletionTool[] = [
     }
 ];
 
-async function getAllFiles(dir: string, baseDir: string, ignoreDirs = ["node_modules", ".git", "dist", "workspace"]): Promise<string[]> {
+async function getAllFiles(dir: string, baseDir: string, ignoreDirs = ["node_modules", ".git", "dist", "workspace", "target", "build"]): Promise<string[]> {
     let results: string[] = [];
     const list = await fs.readdir(dir, { withFileTypes: true });
 
@@ -145,7 +145,7 @@ export async function executeToolCall(
                 const sliced = lines.slice(start, end);
                 return `=== ${filePath} (lines ${start + 1}-${end} of ${lines.length}) ===\n` + sliced.join("\n");
             }
-            return `=== ${filePath} ===\n` + content;
+            return `=== ${filePath} (${lines.length} lines) ===\n` + content;
         }
 
         if (name === "read_multiple_files") {
@@ -182,7 +182,10 @@ export async function executeToolCall(
 
                     lines.forEach((line, idx) => {
                         if (line.includes(query)) {
-                            matches.push(`${relPath}:${idx + 1}: ${line.trim()}`);
+                            const trimmed = line.trim();
+                            // Truncate long lines to 120 chars to save tokens
+                            const truncated = trimmed.length > 120 ? trimmed.substring(0, 120) + "..." : trimmed;
+                            matches.push(`${relPath}:${idx + 1}: ${truncated}`);
                         }
                     });
                 } catch {}
@@ -191,7 +194,10 @@ export async function executeToolCall(
             if (matches.length === 0) {
                 return `No occurrences of '${query}' found in codebase.`;
             }
-            return `Search results for '${query}' (${matches.length} matches):\n` + matches.slice(0, 50).join("\n");
+
+            // Cap search matches to top 15 results to save tokens
+            const cappedMatches = matches.slice(0, 15);
+            return `Search results for '${query}' (${matches.length} total matches, showing top ${cappedMatches.length}):\n` + cappedMatches.join("\n");
         }
 
         if (name === "list_directory") {

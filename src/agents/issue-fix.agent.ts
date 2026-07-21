@@ -10,6 +10,7 @@ export interface IssueFixInput {
     relevantFiles?: string[];
     fileContents?: FileContentItem[];
     repoPath?: string;
+    userAnswer?: string | undefined;
 }
 
 export interface Replacement {
@@ -78,6 +79,8 @@ Issue to fix:
 ${issueDetails}
 
 ${input.relevantFiles ? `Initially identified relevant files: ${input.relevantFiles.join(', ')}` : ''}
+
+${input.userAnswer ? `User Response to your previous question: "${input.userAnswer}"` : ''}
 
 Use your tools to inspect the codebase and solve this issue. When ready, invoke submit_fix or ask_user.
 `;
