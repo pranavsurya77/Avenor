@@ -1,5 +1,6 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { nvidiaClient, DEFAULT_MODEL } from "../config/nvidia.js";
+import { openrouterClient, DEFAULT_MODEL } from "../config/openrouter.js";
+import type { ORChatMessage } from "../config/openrouter.js";
 import { AGENT_TOOLS, executeToolCall } from "./agentTools.js";
 
 export interface AgentLoopResult {
@@ -40,9 +41,9 @@ export async function runInteractiveAgentLoop(
             }
         }
 
-        const response = await nvidiaClient.chat.completions.create({
+        const response = await openrouterClient.chat.completions.create({
             model: DEFAULT_MODEL,
-            messages,
+            messages: messages as any,
             tools: AGENT_TOOLS,
             temperature: 0.1
         });

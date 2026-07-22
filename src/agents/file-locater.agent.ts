@@ -1,4 +1,4 @@
-import { nvidiaClient, DEFAULT_MODEL } from '../config/nvidia.js';
+import { openrouterClient, DEFAULT_MODEL } from '../config/openrouter.js';
 
 export interface PipelinePayload {
     issues: any[];
@@ -99,7 +99,7 @@ Example: { "files": ["README.md"] }
 
     try {
         console.log(`[file-locater] Sending request to AI model (${DEFAULT_MODEL})...`);
-        const response = await nvidiaClient.chat.completions.create({
+        const response = await openrouterClient.chat.completions.create({
             model: DEFAULT_MODEL,
             messages: [
                 { role: "user", content: prompt }
