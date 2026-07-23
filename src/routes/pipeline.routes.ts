@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { executePipeline, getJobStatus, replyToJob } from "../controller/pipeline.controller.js";
+import { isLoggedIn } from "../middleware/login.middleware.js";
 
 const router = Router();
+
+// Apply authentication middleware to all routes in this router
+router.use(isLoggedIn);
 
 // Queue repository analysis pipeline (default branch: main)
 router.route("/repos/:owner/:repo/start").get(executePipeline).post(executePipeline);

@@ -3,12 +3,18 @@ import {
     fetchIssues,
     fetchTree,
     fetchCombined,
+    fetchUserRepos,
     cloneRepoController,
     cleanWorkspaceController,
     cleanRepoCloneController
 } from "../controller/github.controller.js";
+import { isLoggedIn } from "../middleware/login.middleware.js";
 
 const router = Router();
+
+// Fetch repositories for logged-in user or specific username
+router.route("/user/repos").get(isLoggedIn, fetchUserRepos);
+router.route("/users/:username/repos").get(fetchUserRepos);
 
 // Clean entire workspace (clears all cloned repos)
 router.route("/repos/clean").get(cleanWorkspaceController).delete(cleanWorkspaceController);

@@ -1,4 +1,4 @@
-import { getGithubIssues, getRepoTree } from "../services/github.service.js";
+import { getGithubIssues, getRepoTree, getUserRepositories } from "../services/github.service.js";
 import { cloneRepo, cleanWorkspace, cleanRepoClone } from "../utils/clone.utils.js";
 import type { Request, Response } from "express";
 
@@ -10,6 +10,39 @@ function getBranch(req: Request): string {
         return req.query.branch;
     }
     return "main";
+}
+
+// Fetches public repositories for a GitHub user or logged in user
+export async function fetchUserRepos(req: Request, res: Response) {
+    try {
+        const user = (req as any).user;
+        const token = req.cookies?.accessToken || req.headers.authorization?.split(" ")[1];
+        let username: string | undefined = typeof req.params.username === "string" ? req.params.username : undefined;
+
+        // If authenticated with a GitHub OAuth token, use the /user/repos endpoint directly
+        // (no username needed — the token identifies the user)
+        if (!username && token && (token.startsWith("gho_") || token.startsWith("ghp_"))) {
+            const repos = await getUserRepositories("", token);
+            res.json(repos);
+            return;
+        }
+
+        // Otherwise, resolve the GitHub login from the DB user
+        if (!username && user) {
+            username = user.githubLogin || (user.email ? user.email.split("@")[0] : undefined);
+        }
+
+        if (!username || typeof username !== "string") {
+            res.status(400).json({ error: "GitHub username is required. Please log in via GitHub OAuth or provide a username." });
+            return;
+        }
+
+        const repos = await getUserRepositories(username, token);
+        res.json(repos);
+    } catch (error: any) {
+        console.log("Error in fetchUserRepos:", error);
+        res.status(500).json({ error: "Failed to fetch user repositories", details: error.message || String(error) });
+    }
 }
 
 // Fetches issues only for a repository

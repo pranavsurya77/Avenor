@@ -70,3 +70,42 @@ export async function getRepoTree(owner: string, repo: string, branch = "main") 
     }
 }
 
+import axios from "axios";
+
+// Fetches repositories for a given GitHub username or authenticated user
+export async function getUserRepositories(username: string, token?: string) {
+    const cleanUsername = username.trim();
+    const headers: Record<string, string> = {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "Avenor-App"
+    };
+
+    if (token && (token.startsWith("gho_") || token.startsWith("ghp_"))) {
+        headers["Authorization"] = `Bearer ${token}`;
+    } else if (process.env.GITHUB_PAT) {
+        headers["Authorization"] = `Bearer ${process.env.GITHUB_PAT}`;
+    }
+
+    try {
+        const isUserToken = Boolean(token && (token.startsWith("gho_") || token.startsWith("ghp_")));
+        const url = isUserToken
+            ? "https://api.github.com/user/repos?sort=updated&per_page=100"
+            : `https://api.github.com/users/${encodeURIComponent(cleanUsername)}/repos?sort=updated&per_page=100`;
+
+        const response = await axios.get(url, { headers });
+        return response.data.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            full_name: r.full_name,
+            owner: r.owner.login,
+            private: r.private,
+            default_branch: r.default_branch,
+            html_url: r.html_url,
+            description: r.description
+        }));
+    } catch (error: any) {
+        console.error(`Error fetching repositories for user '${username}':`, error.response?.data || error.message);
+        throw new Error(error.response?.data?.message || error.message);
+    }
+}
+

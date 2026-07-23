@@ -77,11 +77,14 @@ export async function githubCallback(req: Request, res: Response) {
         });
 
         if (user) {
-            // Update githubId if they previously signed up with email
-            if (!user.githubId) {
+            // Update githubId/githubLogin if they previously signed up with email
+            if (!user.githubId || !user.githubLogin) {
                 user = await prisma.user.update({
                     where: { id: user.id },
-                    data: { githubId: String(githubUser.id) }
+                    data: {
+                        githubId: String(githubUser.id),
+                        githubLogin: githubUser.login,
+                    }
                 });
             }
         } else {
@@ -90,6 +93,7 @@ export async function githubCallback(req: Request, res: Response) {
                 data: {
                     email: email,
                     githubId: String(githubUser.id),
+                    githubLogin: githubUser.login,
                     name: githubUser.name || githubUser.login,
                     avatarUrl: githubUser.avatar_url,
                     role: "USER"

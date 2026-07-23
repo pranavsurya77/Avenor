@@ -31,6 +31,18 @@ export async function analyzeRepository(
 
     console.log("[analyzeRepository] Interactive fix result:", fixResult);
 
+
+    //no need to do validation if user input is requried
+    if (fixResult.userInputRequired) {
+        return {
+            issues,
+            relevantFiles,
+            fixes: fixResult,
+            patchSummary: null,
+            validation: null
+        }
+    }
+
     // 4. Apply the generated Unified Diff patch to the repository on disk
     let patchSummary = null;
     if (!fixResult.userInputRequired && fixResult.patch) {

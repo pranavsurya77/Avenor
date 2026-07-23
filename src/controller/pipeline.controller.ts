@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { Job } from "bullmq";
 import { addPipelineJob, pipelineQueue } from "../queue/pipeline.queue.js";
+import { prisma } from "../config/prisma.js";
 
 interface RepoParams {
     owner: string;
@@ -18,6 +19,7 @@ export async function executePipeline(
 ) {
     try {
         const { owner, repo, branch } = req.params;
+        const user = (req as any).user;
 
         const job = await addPipelineJob({
             owner,

@@ -1,15 +1,13 @@
 import { Router } from "express";
-import { signUp, signIn, logOut } from "../controller/auth.controller.js";
+import { logOut } from "../controller/auth.controller.js";
 import { githubLogin, githubCallback } from "../controller/oauth.controller.js";
 import { isLoggedIn } from "../middleware/login.middleware.js";
 
 const router = Router();
 
-router.post("/sign-up", signUp);
-router.post("/sign-in", signIn);
-router.post("/logout", isLoggedIn, logOut);
-
+// Single Sign-On (SSO) via GitHub
 router.get("/github/login", githubLogin);
 router.get("/github/callback", githubCallback);
+router.post("/logout", isLoggedIn, logOut);
 
 export default router;
