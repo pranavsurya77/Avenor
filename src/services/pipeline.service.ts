@@ -4,12 +4,17 @@ import { locateRelevantFiles } from "../agents/file-locater.agent.js";
 import { fixIssues } from "../agents/issue-fix.agent.js";
 import { applyUnifiedDiffPatch } from "../utils/applyPatch.js";
 import { validateRepository } from "../validation/validateRepository.js";
+import { fixBuildIssues } from "../agents/build-fix.agent.js";
+import { setupWorkingBranch } from "../utils/git.utils.js";
+import { Job } from "bullmq";
+import { pipelineQueue } from "../queue/pipeline.queue.js";
 
 export async function analyzeRepository(
     owner: string,
     repo: string,
     branch = "main",
-    userAnswer?: string
+    userAnswer?: string,
+    previousJobId?: string
 ) {
     // 1. Fetch issues, file tree, and clone repository
     const [issues, tree, repoPath] = await Promise.all([
@@ -17,6 +22,22 @@ export async function analyzeRepository(
         getRepoTree(owner, repo, branch),
         cloneRepo(owner, repo)
     ]);
+
+    let workingBranch = `ai-maintenance-${Date.now()}`;
+    if (previousJobId) {
+        try {
+            const prevJob = await Job.fromId(pipelineQueue, previousJobId);
+            if (prevJob?.returnvalue?.workingBranch) {
+                workingBranch = prevJob.returnvalue.workingBranch;
+                console.log(`[analyzeRepository] Reusing existing working branch from previous job: ${workingBranch}`);
+            }
+        } catch (err) {
+            console.error(`[analyzeRepository] Failed to fetch previous job:`, err);
+        }
+    }
+
+    // Creating/checking out working branch
+    await setupWorkingBranch(repoPath, workingBranch);
 
     // 2. Ask AI agent to locate relevant files
     const relevantFiles = await locateRelevantFiles(issues, tree);
@@ -35,6 +56,7 @@ export async function analyzeRepository(
     //no need to do validation if user input is requried
     if (fixResult.userInputRequired) {
         return {
+            workingBranch,
             issues,
             relevantFiles,
             fixes: fixResult,
@@ -45,7 +67,7 @@ export async function analyzeRepository(
 
     // 4. Apply the generated Unified Diff patch to the repository on disk
     let patchSummary = null;
-    if (!fixResult.userInputRequired && fixResult.patch) {
+    if (fixResult.patch) {
         patchSummary = await applyUnifiedDiffPatch(repoPath, fixResult.patch);
         console.log("[analyzeRepository] Patch application summary:", patchSummary);
     }
@@ -55,7 +77,67 @@ export async function analyzeRepository(
     const validationResult = await validateRepository(repoPath);
     console.log("[analyzeRepository] Validation result:", validationResult);
 
+    if (validationResult.buildPassed) {
+        //then raise a pull request
+    } else {
+        const fixedResult = await fixBuildIssues(
+            {
+                validationResult,
+                relevantFiles,
+                repoPath
+            }
+        );
+
+        if (fixedResult.userInputRequired) {
+            return {
+                stage: "build_fix",
+                workingBranch,
+                issues,
+                relevantFiles,
+                fixes: {
+                    ...fixResult,
+                    userInputRequired: true
+                },
+                buildFix: fixedResult,
+                patchSummary,
+                validation: validationResult
+            };
+        }
+
+        if (fixedResult.patch) {
+            const buildPatchSummary = await applyUnifiedDiffPatch(repoPath, fixedResult.patch);
+            if (!buildPatchSummary.success) {
+                return {
+                    error: "Failed to apply build patch"
+                };
+            }
+            console.log("[analyzeRepository] Build patch application summary:", buildPatchSummary);
+        }
+
+        console.log("[analyzeRepository] Running repository build validation after fixing build issues...");
+        const revalidation = await validateRepository(repoPath);
+        console.log("[analyzeRepository] Validation result:", revalidation);
+
+        if (revalidation.buildPassed) {
+            console.log("Build fixed successfully");
+        } else {
+            console.log("Build still not fixed");
+        }
+
+        return {
+            workingBranch,
+            issues,
+            relevantFiles,
+            fixes: fixResult,
+            buildFix: fixedResult,
+            patchSummary,
+            validation: revalidation
+        };
+    }
+
+
     return {
+        workingBranch,
         issues,
         relevantFiles,
         fixes: fixResult,

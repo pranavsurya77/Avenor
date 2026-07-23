@@ -107,7 +107,7 @@ export const AGENT_TOOLS: ChatCompletionTool[] = [
                 required: ["patch", "explanation"]
             }
         }
-    }
+    },
 ];
 
 async function getAllFiles(dir: string, baseDir: string, ignoreDirs = ["node_modules", ".git", "dist", "workspace", "target", "build"]): Promise<string[]> {
@@ -188,7 +188,7 @@ export async function executeToolCall(
                             matches.push(`${relPath}:${idx + 1}: ${truncated}`);
                         }
                     });
-                } catch {}
+                } catch { }
             }
 
             if (matches.length === 0) {

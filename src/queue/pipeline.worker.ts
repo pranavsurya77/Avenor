@@ -13,7 +13,7 @@ export function initPipelineWorker() {
     pipelineWorker = new Worker<PipelineJobData>(
         PIPELINE_QUEUE_NAME,
         async (job: Job<PipelineJobData>) => {
-            const { owner, repo, branch, userAnswer, prismaJobId } = job.data;
+            const { owner, repo, branch, userAnswer, prismaJobId, previousJobId } = job.data;
 
             console.log(
                 `[Worker] Processing Job #${job.id} (Prisma Job ID: ${prismaJobId || "N/A"}): ${owner}/${repo} (Branch: ${branch || "main"})${userAnswer ? " [Resuming with User Answer]" : ""}`
@@ -27,12 +27,15 @@ export function initPipelineWorker() {
                 }).catch((err) => console.error(`[Worker] Failed to update Prisma Job #${prismaJobId} status to RUNNING:`, err));
             }
 
+            //should i add it here
+
             try {
                 const result = await analyzeRepository(
                     owner,
                     repo,
                     branch || "main",
-                    userAnswer
+                    userAnswer,
+                    previousJobId
                 );
 
                 await job.updateProgress(100);
