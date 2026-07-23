@@ -97,14 +97,36 @@ export const AGENT_TOOLS: ChatCompletionTool[] = [
         type: "function",
         function: {
             name: "submit_fix",
-            description: "Submit the final Unified Diff (git diff) patch and explanation resolving the issue.",
+            description: "Submit the final code changes resolving the issue using search/replace blocks or a patch.",
             parameters: {
                 type: "object",
                 properties: {
-                    patch: { type: "string", description: "Standard Unified Diff patch string starting with --- a/... and +++ b/..." },
+                    fixes: {
+                        type: "array",
+                        description: "List of files to modify and their search/replace chunks. Use this instead of patch for maximum reliability.",
+                        items: {
+                            type: "object",
+                            properties: {
+                                path: { type: "string", description: "Relative path to the file in the repository." },
+                                replacements: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            search: { type: "string", description: "The exact sequence of characters to search for in the file (must match exactly including whitespace)." },
+                                            replace: { type: "string", description: "The replacement string." }
+                                        },
+                                        required: ["search", "replace"]
+                                    }
+                                }
+                            },
+                            required: ["path", "replacements"]
+                        }
+                    },
+                    patch: { type: "string", description: "Deprecated: Standard Unified Diff patch string starting with --- a/... and +++ b/..." },
                     explanation: { type: "string", description: "Summary of the changes made and why." }
                 },
-                required: ["patch", "explanation"]
+                required: ["explanation"]
             }
         }
     },

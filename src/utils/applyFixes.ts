@@ -35,17 +35,26 @@ export async function applyFixes(
         try {
             let content = await fs.readFile(absoluteFilePath, "utf-8");
             let fileModified = false;
+            const isCRLF = content.includes("\r\n");
 
             for (const replacement of fix.replacements) {
                 const { search, replace } = replacement;
                 if (!search) continue;
 
-                if (content.includes(search)) {
-                    content = content.replace(search, replace);
+                const normalizedSearch = isCRLF
+                    ? search.replace(/\r?\n/g, "\r\n")
+                    : search.replace(/\r?\n/g, "\n");
+
+                const normalizedReplace = isCRLF
+                    ? replace.replace(/\r?\n/g, "\r\n")
+                    : replace.replace(/\r?\n/g, "\n");
+
+                if (content.includes(normalizedSearch)) {
+                    content = content.replace(normalizedSearch, normalizedReplace);
                     fileModified = true;
                     appliedCount++;
                 } else {
-                    const errorMsg = `Search target not found in ${fix.path}: "${search.substring(0, 50)}..."`;
+                    const errorMsg = `Search target not found in ${fix.path}: "${normalizedSearch.substring(0, 50)}..."`;
                     console.warn(`[applyFixes] ${errorMsg}`);
                     errors.push(errorMsg);
                 }

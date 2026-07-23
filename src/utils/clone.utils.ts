@@ -6,7 +6,8 @@ const git = simpleGit();
 
 export async function cloneRepo(
     owner: string,
-    repo: string
+    repo: string,
+    token?: string | null
 ) {
     const repoPath = path.join(
         process.cwd(),
@@ -14,14 +15,22 @@ export async function cloneRepo(
         `${owner}-${repo}`
     );
 
+    const cloneUrl = token
+        ? `https://x-access-token:${token}@github.com/${owner}/${repo}.git`
+        : `https://github.com/${owner}/${repo}.git`;
+
     try {
         await fs.access(repoPath);
-        console.log("Repo already exists");
+        console.log("Repo already exists, updating remote URL with token if provided");
+        if (token) {
+            const localGit = simpleGit(repoPath);
+            await localGit.remote(["set-url", "origin", cloneUrl]);
+        }
         return repoPath;
     } catch { }
 
     await git.clone(
-        `https://github.com/${owner}/${repo}.git`,
+        cloneUrl,
         repoPath
     );
 

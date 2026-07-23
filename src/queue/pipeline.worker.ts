@@ -4,6 +4,8 @@ import { PIPELINE_QUEUE_NAME, type PipelineJobData } from "./pipeline.queue.js";
 import { analyzeRepository } from "../services/pipeline.service.js";
 import { prisma } from "../config/prisma.js";
 import { JobStatus } from "../generated/prisma/enums.js";
+import type { PipelineContext } from "../context/pipeline.context.js";
+import { logJobEvent } from "../utils/log.js";
 
 export let pipelineWorker: Worker<PipelineJobData> | null = null;
 
@@ -14,6 +16,25 @@ export function initPipelineWorker() {
         PIPELINE_QUEUE_NAME,
         async (job: Job<PipelineJobData>) => {
             const { owner, repo, branch, userAnswer, prismaJobId, previousJobId } = job.data;
+
+            //passing down this context to other files to save to log table
+            const context: PipelineContext = {
+                prismaJobId: prismaJobId || "",
+                bullJobId: String(job.id),
+
+                log: async (level, message, metadata) => {
+                    if (prismaJobId) {
+                        await logJobEvent(
+                            prismaJobId,
+                            level,
+                            message,
+                            metadata
+                        ).catch((err) => {
+                            console.error(`[Worker] Failed to write log event to database:`, err);
+                        });
+                    }
+                }
+            };
 
             console.log(
                 `[Worker] Processing Job #${job.id} (Prisma Job ID: ${prismaJobId || "N/A"}): ${owner}/${repo} (Branch: ${branch || "main"})${userAnswer ? " [Resuming with User Answer]" : ""}`
@@ -29,6 +50,7 @@ export function initPipelineWorker() {
 
             try {
                 const result = await analyzeRepository(
+                    context,
                     owner,
                     repo,
                     branch || "main",
@@ -38,7 +60,21 @@ export function initPipelineWorker() {
 
                 await job.updateProgress(100);
 
-                if (result?.fixes?.userInputRequired) {
+                if (result?.error) {
+                    if (prismaJobId) {
+                        await prisma.job.update({
+                            where: { id: prismaJobId },
+                            data: {
+                                status: JobStatus.FAILED,
+                                completedAt: new Date(),
+                                updatedAt: new Date()
+                            }
+                        }).catch((err) => console.error(`[Worker] Failed to update Prisma Job #${prismaJobId} status to FAILED:`, err));
+                    }
+                    console.error(
+                        `[Worker] Job #${job.id} failed: ${result.error}`
+                    );
+                } else if (result?.fixes?.userInputRequired) {
                     if (prismaJobId) {
                         await prisma.job.update({
                             where: { id: prismaJobId },

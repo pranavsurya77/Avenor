@@ -1,8 +1,9 @@
 import { runInteractiveAgentLoop } from "../tools/agentRunner.js";
 import type { ValidationResult } from "../validation/validateRepository.js";
-
+import type { PipelineContext } from "../context/pipeline.context.js";
 
 interface BuildInput {
+    context: PipelineContext,
     validationResult: ValidationResult;
     relevantFiles: string[];
     repoPath: string;
@@ -17,6 +18,7 @@ type BuildFixResult =
         userInputRequired: false;
         patch: string;
         explanation: string;
+        fixes?: any[];
     };
 
 
@@ -38,12 +40,13 @@ export async function fixBuildIssues(
             4. 'list_directory': Explore subdirectories.
             5. 'find_references': Search for usages or imports of a symbol/function/class.
             6. 'ask_user': Ask the user a question if context is ambiguous or decisions are needed.
-            7. 'submit_fix': Submit your final Unified Diff (git diff) patch and explanation.
+            7. 'submit_fix': Submit your final code changes using search/replace blocks.
 
             Instructions:
             - Use 'read_multiple_files' when inspecting multiple files to conserve turns and tokens.
             - Explore import chains and relevant files to verify your solution.
-            - Output your patch using standard Unified Diff format (--- a/filePath ... +++ b/filePath).
+            - To submit code changes, call 'submit_fix' with a list of 'fixes'. Each fix must contain the relative file path and one or more replacement chunks.
+            - For search/replace blocks, specify the exact character sequence to be replaced (including leading whitespace and newlines) as the 'search' block. Ensure it exists uniquely in the target file.
             - If information is insufficient or user guidance is required, call 'ask_user'.
         `;
 
@@ -69,8 +72,10 @@ export async function fixBuildIssues(
         `;
 
         if (input.repoPath) {
+            await input.context.log("INFO", "[build-fix] Launching interactive tool loop...");
             console.log("[build-fix] Launching interactive tool loop...");
             const loopResult = await runInteractiveAgentLoop(
+                input.context,
                 systemPrompt,
                 userPrompt,
                 input.repoPath,
@@ -88,6 +93,7 @@ export async function fixBuildIssues(
                 return {
                     userInputRequired: false,
                     patch: loopResult.patch || "",
+                    fixes: loopResult.fixes || [],
                     explanation: loopResult.explanation || ""
                 };
             }
@@ -105,6 +111,7 @@ export async function fixBuildIssues(
 
 
     } catch (error) {
+        await input.context.log("ERROR", "[Build fix Agent]Error fixing build issue");
         console.error(
             "[Build fix Agent] Error fixing build issue",
             error

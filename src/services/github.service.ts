@@ -160,3 +160,15 @@ export async function createIssueComment(
     });
     return response.data;
 }
+
+export async function getRepoToken(owner: string, repo: string): Promise<string | null> {
+    try {
+        const octokit = await getOctokitForRepo(owner, repo);
+        const authData = await octokit.auth({ type: "installation" }) as any;
+        return authData?.token || null;
+    } catch (error: any) {
+        console.warn(`[getRepoToken] Failed to get GitHub App installation token: ${error.message}. Falling back to GITHUB_PAT.`);
+        return process.env.GITHUB_PAT || null;
+    }
+}
+

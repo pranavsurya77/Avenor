@@ -2,6 +2,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { openrouterClient, DEFAULT_MODEL } from "../config/openrouter.js";
 import type { ORChatMessage } from "../config/openrouter.js";
 import { AGENT_TOOLS, executeToolCall } from "./agentTools.js";
+import type { PipelineContext } from "../context/pipeline.context.js";
 
 export interface AgentLoopResult {
     type: "submit_fix" | "ask_user" | "max_iterations";
@@ -9,22 +10,26 @@ export interface AgentLoopResult {
     explanation?: string;
     question?: string;
     rawContent?: string;
+    fixes?: any[];
 }
 
 export async function runInteractiveAgentLoop(
+    context: PipelineContext,
     systemPrompt: string,
     userPrompt: string,
     repoPath: string,
-    maxIterations = 10
+    maxIterations = 10,
 ): Promise<AgentLoopResult> {
     const messages: ChatCompletionMessageParam[] = [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
     ];
 
+    await context.log("INFO", `[AgentRunner] Starting interactive tool loop (Max steps: ${maxIterations})...`);
     console.log(`[AgentRunner] Starting interactive tool loop (Max steps: ${maxIterations})...`);
 
     for (let step = 1; step <= maxIterations; step++) {
+        await context.log("INFO", `[AgentRunner] --- Iteration Step ${step}/${maxIterations} ---`);
         console.log(`[AgentRunner] --- Iteration Step ${step}/${maxIterations} ---`);
 
         // Token Optimization: Prune long outputs from older tool calls (keep last 6 messages full)
@@ -52,6 +57,7 @@ export async function runInteractiveAgentLoop(
         const assistantMessage = choice?.message;
 
         if (!assistantMessage) {
+            await context.log("ERROR", "[AgentRunner] No message returned from model.");
             console.error("[AgentRunner] No message returned from model.");
             break;
         }
@@ -60,6 +66,7 @@ export async function runInteractiveAgentLoop(
 
         const toolCalls = assistantMessage.tool_calls;
         if (!toolCalls || toolCalls.length === 0) {
+            await context.log("INFO", "[AgentRunner] Model finished turn without further tool calls.")
             console.log("[AgentRunner] Model finished turn without further tool calls.");
             const content = assistantMessage.content || "";
             return {
@@ -77,21 +84,26 @@ export async function runInteractiveAgentLoop(
             try {
                 toolArgs = JSON.parse(tc.function.arguments || "{}");
             } catch (err) {
+                await context.log("ERROR", `[AgentRunner] Failed to parse tool args for '${toolName}':`, err);
                 console.error(`[AgentRunner] Failed to parse tool args for '${toolName}':`, err);
             }
 
+            await context.log("INFO", `[AgentRunner] Tool Invoked: '${toolName}'`, toolArgs);
             console.log(`[AgentRunner] Tool Invoked: '${toolName}'`, toolArgs);
 
             if (toolName === "submit_fix") {
-                console.log("[AgentRunner] 'submit_fix' tool called. Returning final patch.");
+                await context.log("INFO", "[AgentRunner] 'submit_fix' tool called. Returning final changes.");
+                console.log("[AgentRunner] 'submit_fix' tool called. Returning final changes.");
                 return {
                     type: "submit_fix",
                     patch: toolArgs.patch || "",
+                    fixes: toolArgs.fixes || [],
                     explanation: toolArgs.explanation || ""
                 };
             }
 
             if (toolName === "ask_user") {
+                await context.log("INFO", "[AgentRunner] 'ask_user' tool called. Clarification requested.");
                 console.log("[AgentRunner] 'ask_user' tool called. Clarification requested.");
                 return {
                     type: "ask_user",
@@ -101,6 +113,10 @@ export async function runInteractiveAgentLoop(
 
             // Execute code reading / searching / list directory tools locally
             const output = await executeToolCall(toolName, toolArgs, repoPath);
+            await context.log("INFO", `[AgentRunner] Tool '${toolName}' output length: ${output.length} characters.`, {
+                toolName,
+                outputLength: output.length
+            });
             console.log(`[AgentRunner] Tool '${toolName}' output length: ${output.length} characters.`);
 
             messages.push({
@@ -111,6 +127,7 @@ export async function runInteractiveAgentLoop(
         }
     }
 
+    await context.log("WARN", "[AgentRunner] Reached maximum iterations without explicit submit_fix or ask_user.");
     console.warn("[AgentRunner] Reached maximum iterations without explicit submit_fix or ask_user.");
     return {
         type: "max_iterations",
