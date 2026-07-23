@@ -130,6 +130,21 @@ export const AGENT_TOOLS: ChatCompletionTool[] = [
             }
         }
     },
+    {
+        type: "function",
+        function: {
+            name: "create_file",
+            description: "Create a new file in the repository with the specified content. Parent directories will be automatically created if they do not exist.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filePath: { type: "string", description: "Relative path to the file in the repository." },
+                    content: { type: "string", description: "The content to write to the file." }
+                },
+                required: ["filePath", "content"]
+            }
+        }
+    },
 ];
 
 async function getAllFiles(dir: string, baseDir: string, ignoreDirs = ["node_modules", ".git", "dist", "workspace", "target", "build"]): Promise<string[]> {
@@ -233,6 +248,16 @@ export async function executeToolCall(
             });
 
             return `Directory listing for '${targetSub}':\n` + formatted.join("\n");
+        }
+
+        if (name === "create_file") {
+            const { filePath, content } = args;
+            if (!filePath) return "Error: filePath is required.";
+            const absolutePath = path.join(repoPath, filePath);
+            const parentDir = path.dirname(absolutePath);
+            await fs.mkdir(parentDir, { recursive: true });
+            await fs.writeFile(absolutePath, content || "", "utf-8");
+            return `Successfully created file: ${filePath}`;
         }
 
         if (name === "ask_user" || name === "submit_fix") {

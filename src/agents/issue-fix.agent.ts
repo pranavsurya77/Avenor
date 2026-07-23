@@ -67,11 +67,13 @@ Available Tools:
 4. 'list_directory': Explore subdirectories.
 5. 'find_references': Search for usages or imports of a symbol/function/class.
 6. 'ask_user': Ask the user a question if context is ambiguous or decisions are needed.
-7. 'submit_fix': Submit your final code changes using search/replace blocks.
+7. 'create_file': Create a new file in the repository with the specified content.
+8. 'submit_fix': Submit your final code changes using search/replace blocks.
 
 Instructions:
 - Use 'read_multiple_files' when inspecting multiple files to conserve turns and tokens.
 - Explore import chains and relevant files to verify your solution.
+- If you need to create a new file, call 'create_file' with 'filePath' and 'content'.
 - To submit code changes, call 'submit_fix' with a list of 'fixes'. Each fix must contain the relative file path and one or more replacement chunks.
 - For search/replace blocks, specify the exact character sequence to be replaced (including leading whitespace and newlines) as the 'search' block. Ensure it exists uniquely in the target file.
 - If information is insufficient or user guidance is required, call 'ask_user'.
