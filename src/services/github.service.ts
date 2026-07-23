@@ -109,3 +109,54 @@ export async function getUserRepositories(username: string, token?: string) {
     }
 }
 
+export async function createPullRequest(
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string
+) {
+    const octokit = await getOctokitForRepo(owner, repo);
+    const response = await octokit.request("POST /repos/{owner}/{repo}/pulls", {
+        owner,
+        repo,
+        title,
+        body,
+        head,
+        base,
+    });
+    return response.data;
+}
+
+
+export async function closeIssue(
+    owner: string,
+    repo: string,
+    issueNumber: number
+) {
+    const octokit = await getOctokitForRepo(owner, repo);
+    const response = await octokit.request("PATCH /repos/{owner}/{repo}/issues/{issue_number}", {
+        owner,
+        repo,
+        issue_number: issueNumber,
+        state: "closed",
+    });
+    return response.data;
+}
+
+export async function createIssueComment(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string
+) {
+    const octokit = await getOctokitForRepo(owner, repo);
+    const response = await octokit.request("POST /repos/{owner}/{repo}/issues/{issue_number}/comments", {
+        owner,
+        repo,
+        issue_number: issueNumber,
+        body,
+    });
+    return response.data;
+}

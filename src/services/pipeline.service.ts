@@ -8,6 +8,9 @@ import { fixBuildIssues } from "../agents/build-fix.agent.js";
 import { setupWorkingBranch } from "../utils/git.utils.js";
 import { Job } from "bullmq";
 import { pipelineQueue } from "../queue/pipeline.queue.js";
+import { commitAndPush, createPR } from "../utils/pullrequest.js";
+import { closeIssues } from "../utils/closeIssue.js";
+
 
 export async function analyzeRepository(
     owner: string,
@@ -36,6 +39,8 @@ export async function analyzeRepository(
         }
     }
 
+    let pullRequest: any = null;
+
     // Creating/checking out working branch
     await setupWorkingBranch(repoPath, workingBranch);
 
@@ -61,7 +66,8 @@ export async function analyzeRepository(
             relevantFiles,
             fixes: fixResult,
             patchSummary: null,
-            validation: null
+            validation: null,
+            pullRequest: null
         }
     }
 
@@ -78,7 +84,34 @@ export async function analyzeRepository(
     console.log("[analyzeRepository] Validation result:", validationResult);
 
     if (validationResult.buildPassed) {
-        //then raise a pull request
+        console.log("[analyzeRepository] Pushing changes to remote repository...");
+        const commitMsg = issues?.[0]?.title ? `Fix: ${issues[0].title}` : "Fix: resolve repository maintenance issues";
+        const pushResult = await commitAndPush(repoPath, commitMsg, workingBranch);
+        if (!pushResult.success) {
+            return {
+                error: `Failed to push changes: ${pushResult.error}`
+            };
+        }
+        console.log("[analyzeRepository] Raising pull request...");
+        const prResult = await createPR(
+            owner,
+            repo,
+            commitMsg,
+            `Auto-generated fix for issue: ${commitMsg}\n\nBuild status: PASSED`,
+            workingBranch,
+            branch
+        );
+        if (!prResult.success) {
+            return {
+                error: `Failed to raise pull request: ${prResult.error}`
+            };
+        }
+        pullRequest = prResult.pullRequest;
+        const prUrl = prResult.pullRequest?.html_url;
+        const commentBody = prUrl
+            ? `This issue has been resolved by pull request: ${prUrl}. Closing issue.`
+            : "This issue has been resolved. Closing issue.";
+        await closeIssues(owner, repo, issues, commentBody);
     } else {
         const fixedResult = await fixBuildIssues(
             {
@@ -119,7 +152,34 @@ export async function analyzeRepository(
         console.log("[analyzeRepository] Validation result:", revalidation);
 
         if (revalidation.buildPassed) {
-            console.log("Build fixed successfully");
+            console.log("[analyzeRepository] Pushing changes to remote repository...");
+            const commitMsg = issues?.[0]?.title ? `Fix: ${issues[0].title}` : "Fix: resolve repository maintenance issues";
+            const pushResult = await commitAndPush(repoPath, commitMsg, workingBranch);
+            if (!pushResult.success) {
+                return {
+                    error: `Failed to push changes: ${pushResult.error}`
+                };
+            }
+            console.log("[analyzeRepository] Raising pull request...");
+            const prResult = await createPR(
+                owner,
+                repo,
+                commitMsg,
+                `Auto-generated fix for issue: ${commitMsg}\n\nBuild status: PASSED (after build fixes)`,
+                workingBranch,
+                branch
+            );
+            if (!prResult.success) {
+                return {
+                    error: `Failed to raise pull request: ${prResult.error}`
+                };
+            }
+            pullRequest = prResult.pullRequest;
+            const prUrl = prResult.pullRequest?.html_url;
+            const commentBody = prUrl
+                ? `This issue has been resolved by pull request: ${prUrl}. Closing issue.`
+                : "This issue has been resolved. Closing issue.";
+            await closeIssues(owner, repo, issues, commentBody);
         } else {
             console.log("Build still not fixed");
         }
@@ -131,7 +191,8 @@ export async function analyzeRepository(
             fixes: fixResult,
             buildFix: fixedResult,
             patchSummary,
-            validation: revalidation
+            validation: revalidation,
+            pullRequest
         };
     }
 
@@ -142,6 +203,7 @@ export async function analyzeRepository(
         relevantFiles,
         fixes: fixResult,
         patchSummary,
-        validation: validationResult
+        validation: validationResult,
+        pullRequest
     };
 }

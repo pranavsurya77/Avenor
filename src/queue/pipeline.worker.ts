@@ -27,8 +27,6 @@ export function initPipelineWorker() {
                 }).catch((err) => console.error(`[Worker] Failed to update Prisma Job #${prismaJobId} status to RUNNING:`, err));
             }
 
-            //should i add it here
-
             try {
                 const result = await analyzeRepository(
                     owner,
